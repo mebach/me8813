@@ -1,8 +1,13 @@
 import numpy as np
-import random
+import pandas as pd
 from sklearn.linear_model import LinearRegression, Lasso, Ridge
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, WhiteKernel, ExpSineSquared, DotProduct
 from sklearn.model_selection import train_test_split, cross_validate
+import tensorflow as tf
+from tensorflow import keras
+from keras import layers
+# print(tf.__version__)
 import matplotlib.pyplot as plt
 
 #########################################################
@@ -85,16 +90,29 @@ def perform_gaussian():
     y = data[:, 16]
 
     # Split the data into a training and a test set
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=50)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1)
     N_train = np.shape(X_train)[0]
     N_test = np.shape(X_test)[0]
 
-    model_gaussian = GaussianProcessRegressor(random_state=1)
-    model_gaussian.fit(X_train, y_train)
-    print(model_gaussian.predict(X_train))
+    # f = plt.figure()
+    # ax = f.add_subplot()
+    # ax.plot(X_train[:, 1], y_train, 'bo', markersize=1)
+    # ax.set_xlabel('Factor 2')
+    # ax.set_ylabel('Response')
+    # plt.show()
 
-    # plt.plot(X_test[:, 3], model_gaussian.predict(X_test), 'bo')
-    # plt.plot(X_test[:, 3], y_test, 'go')
+
+    # Create the gaussian model and fit
+    length_scale = np.ones(15)
+    kernel = RBF(length_scale=length_scale) + WhiteKernel()
+    model_gaussian = GaussianProcessRegressor(kernel=kernel, alpha=1e-6, random_state=5, normalize_y=True)
+    model_gaussian.fit(X_train, y_train)
+    print(f"Hyperparameters: {model_gaussian.kernel_}")
+    # print(model_gaussian.predict(X_train))
+
+    # idx = np.argsort(X_test[:, 0])
+    # plt.plot(X_test[:, 0][idx], model_gaussian.predict(X_test[idx]), 'b--')
+    # plt.plot(X_test[:, 0], y_test, 'go')
     # plt.show()
 
     # Calculate MSE between model and data for traininga and test sets
@@ -107,11 +125,49 @@ def perform_gaussian():
 
     return
 
+#########################################################
+################### NEURAL NETWORK ######################
+#########################################################
+
+
+def perform_nn():
+
+    # import data
+    raw_data = pd.read_csv('HW2Dataset.csv')
+    dataset = raw_data.copy().drop(columns=raw_data.columns[0], axis=1)
+
+    # print(dataset.head())
+
+
+    # split into training and test sets
+    train_dataset = dataset.sample(frac=0.8, random_state=0)
+    test_dataset = dataset.drop(train_dataset.index)
+
+    # print(train_dataset.describe().transpose())
+
+    train_features = train_dataset.copy()
+    test_features = test_dataset.copy()
+
+    train_labels = train_features.pop('stiffness_value')
+    test_labels = test_features.pop('stiffness_value')
+
+    # normalize the data
+    normalizer = tf.keras.layers.Normalization(axis=-1)
+    normalizer.adapt(np.array(train_features))
+
+    # print(normalizer.mean.numpy())
+
+    # print(normalizer(np.array(train_features[:1])).numpy())
+
+    
+
+    print('-------------------------------------------------------------')
+
+    return
 
 if __name__ == '__main__':
 
     # perform_linreg()
-    perform_gaussian()
-    # perform_nn()
-
+    # perform_gaussian()
+    perform_nn()
 
