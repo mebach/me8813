@@ -143,7 +143,7 @@ def perform_nn():
     train_dataset = dataset.sample(frac=0.8, random_state=0)
     test_dataset = dataset.drop(train_dataset.index)
 
-    # print(train_dataset.describe().transpose())
+    print(train_dataset.describe().transpose())
 
     train_features = train_dataset.copy()
     test_features = test_dataset.copy()
@@ -155,11 +155,89 @@ def perform_nn():
     normalizer = tf.keras.layers.Normalization(axis=-1)
     normalizer.adapt(np.array(train_features))
 
-    # print(normalizer.mean.numpy())
+    PC1 = np.array([train_features['PC1']])
+    PC1_normalizer = layers.Normalization(input_shape=[1,], axis=None)
+    PC1_normalizer.adapt(PC1)
+    test_results = {}
 
-    # print(normalizer(np.array(train_features[:1])).numpy())
+    def plot_loss(history):
+        plt.plot(history.history['loss'], label='loss')
+        plt.plot(history.history['val_loss'], label='val_loss')
+        plt.ylim([0, 40])
+        plt.xlabel('Epoch')
+        plt.ylabel('Error [stiffness_value]')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
-    
+    def plot_PC1(x, y):
+        plt.scatter(train_features['PC1'], train_labels, label='Data', s=1)
+        plt.plot(x, y, color='k', label='Predictions')
+        plt.xlabel('PC1')
+        plt.ylabel('stiffness_value')
+        plt.legend()
+        plt.show()
+
+    def build_and_compile_model(norm):
+        model = keras.Sequential([
+            norm,
+            layers.Dense(64, activation='relu'),
+            layers.Dense(64 , activation='relu'),
+            layers.Dense(1)
+        ])
+
+        model.compile(loss='mean_absolute_error',
+                      optimizer=tf.keras.optimizers.Adam(0.0001))
+        return model
+
+    dnn_PC1_model = build_and_compile_model(PC1_normalizer)
+    dnn_PC1_model.summary()
+    history = dnn_PC1_model.fit(
+        train_features['PC1'],
+        train_labels,
+        validation_split=0.2,
+        verbose=0,
+        epochs=40
+    )
+    plot_loss(history)
+    x = tf.linspace(-25, 35, 61)
+    y = dnn_PC1_model.predict(x)
+    plot_PC1(x, y)
+
+    test_results['dnn_PC1_model'] = dnn_PC1_model.evaluate(test_features['PC1'], test_labels, verbose=0)
+
+    dnn_model = build_and_compile_model(normalizer)
+    dnn_model.summary()
+
+    history = dnn_model.fit(
+        train_features,
+        train_labels,
+        validation_split=0.2,
+        verbose=0,
+        epochs=100
+    )
+
+    plot_loss(history)
+    test_results['dnn_model'] = dnn_model.evaluate(test_features, test_labels, verbose=0)
+    print(pd.DataFrame(test_results, index=['Mean absolute error [stiffness_value]']).T)
+
+    test_prediction = dnn_model.predict(test_features).flatten()
+    a = plt.axes(aspect='equal')
+    plt.scatter(test_labels, test_prediction, s=2)
+    plt.xlabel('True Values [stiffness_value]')
+    plt.ylabel('Predictions [stiffness_value]')
+    lims = [0, 110]
+    plt.xlim(lims)
+    plt.ylim(lims)
+    _ = plt.plot(lims, lims)
+    plt.show()
+
+    error = test_prediction - test_labels
+    plt.hist(error, bins=25)
+    plt.xlabel('Prediction Error [stiffness_value]')
+    _ = plt.ylabel('Count')
+    plt.show()
+
 
     print('-------------------------------------------------------------')
 
